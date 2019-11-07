@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<launch>
+
+	<arg name="yamlFile" default="$(find yumi_inv_kin)/config/arm_chain.yaml"/>
+  	<rosparam command="load" file="$(arg yamlFile)"/>
+
+    <group ns="Yumi_RIGHT">
+        <node pkg="yumi_inv_kin" name="OneTaskInvKin" type="OneTaskInvKin_node" output="screen"/>
+    </group>
+
+    <group ns="Yumi_LEFT">
+        <node pkg="yumi_inv_kin" name="OneTaskInvKin" type="OneTaskInvKin_node" output="screen"/>
+    </group> 
+
+</launch>

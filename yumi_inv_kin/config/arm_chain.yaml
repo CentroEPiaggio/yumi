@@ -1,0 +1,7 @@
+Yumi_RIGHT:
+  root_name: "yumi_body"
+  tip_name: "gripper_r_base"
+
+Yumi_LEFT:
+  root_name: "yumi_body"
+  tip_name: "gripper_l_base"
