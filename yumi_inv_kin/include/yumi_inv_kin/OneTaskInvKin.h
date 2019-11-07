@@ -26,5 +26,7 @@ class OneTaskInvKin
 
 	private:
 		ros::NodeHandle n_;
+		KDL::Chain kdl_chain_;
+
 
 };

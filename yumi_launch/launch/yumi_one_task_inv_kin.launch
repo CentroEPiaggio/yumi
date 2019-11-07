@@ -1,14 +1,25 @@
 <?xml version="1.0"?>
 <launch>
-
 	<arg name="yamlFile" default="$(find yumi_inv_kin)/config/arm_chain.yaml"/>
   	<rosparam command="load" file="$(arg yamlFile)"/>
 
     <group ns="Yumi_RIGHT">
+    	<!--  Hardware interfaces for the joints and grippers -->
+	    <arg name="arms_hardware_interface" default="PositionJointInterface"/>
+	    <arg name="grippers_hardware_interface" default="EffortJointInterface"/>
+		<arg name="yumi_setup" default="default"/>
+	    <param name="robot_description" command="$(find xacro)/xacro.py '$(find yumi_description)/urdf/yumi.urdf.xacro' arms_interface:=$(arg arms_hardware_interface) grippers_interface:=$(arg grippers_hardware_interface) yumi_setup:=$(arg yumi_setup)" />
+
         <node pkg="yumi_inv_kin" name="OneTaskInvKin" type="OneTaskInvKin_node" output="screen"/>
     </group>
 
     <group ns="Yumi_LEFT">
+    	<!--  Hardware interfaces for the joints and grippers -->
+	    <arg name="arms_hardware_interface" default="PositionJointInterface"/>
+	    <arg name="grippers_hardware_interface" default="EffortJointInterface"/>
+		<arg name="yumi_setup" default="default"/>
+	    <param name="robot_description" command="$(find xacro)/xacro.py '$(find yumi_description)/urdf/yumi.urdf.xacro' arms_interface:=$(arg arms_hardware_interface) grippers_interface:=$(arg grippers_hardware_interface) yumi_setup:=$(arg yumi_setup)" />
+
         <node pkg="yumi_inv_kin" name="OneTaskInvKin" type="OneTaskInvKin_node" output="screen"/>
     </group> 
 
