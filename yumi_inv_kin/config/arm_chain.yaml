@@ -1,9 +1,11 @@
 Yumi_RIGHT:
-  root_name: "yumi_body"
+  root_name: "yumi_base_link"
   tip_name: "gripper_r_base"
   joint_location: [3, 5, 7, 9, 11, 13, 15]
+  topic_joint_cmd: "/yumi/joint_group_pos_controller_r/command"
 
 Yumi_LEFT:
-  root_name: "yumi_body"
+  root_name: "yumi_base_link"
   tip_name: "gripper_l_base"
   joint_location: [2, 4, 6, 8, 10, 12, 14]
+  topic_joint_cmd: "/yumi/joint_group_pos_controller_l/command"

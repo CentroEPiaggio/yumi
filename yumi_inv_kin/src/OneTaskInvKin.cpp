@@ -72,7 +72,11 @@ OneTaskInvKin::OneTaskInvKin()
     ROS_DEBUG("Number of joints in chain: %d", kdl_chain_.getNrOfJoints());
 
     std::vector<double> joint_location;
+    std::string topic_joint_cmd;
+
     n_.getParam("joint_location", joint_location);
+    n_.getParam("topic_joint_cmd", topic_joint_cmd);
+
     joint_location_ = Eigen::VectorXd::Zero(kdl_chain_.getNrOfJoints());
     joint_location_ << joint_location[0], joint_location[1], joint_location[2],joint_location[3], joint_location[4], joint_location[5], joint_location[6]; 
 
@@ -82,16 +86,18 @@ OneTaskInvKin::OneTaskInvKin()
 	q_msr_.resize(kdl_chain_.getNrOfJoints());
 	q_.resize(kdl_chain_.getNrOfJoints());
 	J_.resize(kdl_chain_.getNrOfJoints());
+	q_eig_ = Eigen::VectorXd::Zero(kdl_chain_.getNrOfJoints());
 
 	k_ = Eigen::Matrix<double, 6, 6>::Identity() * 5.0;
+	step_ = 2;
 	flag_joint_msr_ = false;
 
-	// //Subscriber
+	//Subscriber
 	sub_joint_states_ = n_.subscribe("/yumi/joint_states", 1, &OneTaskInvKin::callback_joint_states, this);
 	sub_des_pos_ = n_.subscribe("command", 10, &OneTaskInvKin::callback_des_pose, this);
 
-	// //Publisher
- //    pub_pos_des_ = n_.advertise<geometry_msgs::PoseStamped>(topic_pose_des, 1);
+	//Publisher
+    pub_joint_cmd_ = n_.advertise<std_msgs::Float64MultiArray>(topic_joint_cmd, 1);
 
 }
 
@@ -106,7 +112,12 @@ void OneTaskInvKin::callback_joint_states(const sensor_msgs::JointState::ConstPt
 	{
 		q_msr_(i) = msg->position[joint_location_(i)];
 	}
-	flag_joint_msr_ = true;
+	if(flag_joint_msr_ == false)
+	{
+		step_ = 0;
+		flag_joint_msr_ = true;
+	}
+	
 }
 
 void OneTaskInvKin::callback_des_pose(const geometry_msgs::Pose::ConstPtr& msg)
@@ -125,6 +136,19 @@ void OneTaskInvKin::callback_des_pose(const geometry_msgs::Pose::ConstPtr& msg)
 void OneTaskInvKin::init()
 {
 	q_ = q_msr_;
+
+	// test
+	q_msr_(0) = q_(0);
+	q_msr_(1) = q_(1);
+	q_msr_(2) = q_(6);
+	q_msr_(3) = q_(2);
+	q_msr_(4) = q_(3);
+	q_msr_(5) = q_(4);
+	q_msr_(6) = q_(5);
+	// test
+
+	for(int i = 0; i < kdl_chain_.getNrOfJoints(); i++) q_eig_(i) = q_msr_(i);
+
 	// computing forward kinematics
    	fk_pos_solver_->JntToCart(q_msr_, x_);
    	Eigen::Matrix3d orient_d;
@@ -138,6 +162,12 @@ void OneTaskInvKin::init()
 		}
 	}
 	quat_d_ = orient_d;
+
+	// std::cout<<"q_msr_: "<< q_msr_(0)<<", "<< q_msr_(1)<<", "<< q_msr_(2)<< ", "<< q_msr_(3)<<", "<< q_msr_(4)<<", "<< q_msr_(5)<<", "<< q_msr_(6)<<std::endl;
+	std::cout<<"pos_init: "<< x_.p(0)<<", "<< x_.p(1)<<", "<< x_.p(2)<<std::endl;
+	// std::cout<<"pos_init: "<< pos_d_.x()<<", "<< pos_d_.y()<<", "<< pos_d_.z()<<std::endl;
+	std::cout<<"quat_init: "<< quat_d_.w()<<", "<< quat_d_.x()<<", "<< quat_d_.y()<<", "<< quat_d_.z()<<std::endl;
+	// getchar();
 }
 
 void OneTaskInvKin::update()
@@ -152,7 +182,10 @@ void OneTaskInvKin::update()
 	Eigen::MatrixXd Jac_, Jac_pinv;
 	Eigen::Quaterniond quat;
 	Eigen::VectorXd e(Eigen::VectorXd::Zero(6));
+	Eigen::VectorXd qdot(Eigen::VectorXd::Zero(kdl_chain_.getNrOfJoints()));
 	KDL::Vector quat_d_vec;
+	std_msgs::Float64MultiArray joint_cmd;
+	joint_cmd.data.clear();
 
 	Jac_.resize(6, kdl_chain_.getNrOfJoints());
 	Jac_pinv.resize(6, kdl_chain_.getNrOfJoints());
@@ -191,14 +224,48 @@ void OneTaskInvKin::update()
 
 	e << e_pos, e_quat;
 
-	// pseudo_inverse(Jac_ , Jac_pinv,true);
+	pseudo_inverse(Jac_, Jac_pinv, true);
 		
-	// qdot_R_ = Jac_pinv * (k_ * e);
+	qdot = Jac_pinv * (k_ * e);
 
-	// q_eig_ += qdot_R_ * dt;
+	q_eig_ += qdot * dt_;
+
+	for(int i = 0; i < kdl_chain_.getNrOfJoints(); i++) 
+	{
+		q_(i) = q_eig_(i);	
+	}
+
+	joint_cmd.data.push_back(q_(0));
+	joint_cmd.data.push_back(q_(1));
+	joint_cmd.data.push_back(q_(6));
+	joint_cmd.data.push_back(q_(2));
+	joint_cmd.data.push_back(q_(3));
+	joint_cmd.data.push_back(q_(4));
+	joint_cmd.data.push_back(q_(5));
+
+	// pub_joint_cmd_.publish(joint_cmd);
+
 }
 
 void OneTaskInvKin::run()
 {
-
+	switch(step_)
+	{
+		case 0:
+		{
+			init();
+			step_ = 1;
+			break;
+		}
+		case 1:
+		{
+			update();
+			break;
+		}
+		case 2:
+		{
+			// nothing
+			break;
+		}
+	}
 }

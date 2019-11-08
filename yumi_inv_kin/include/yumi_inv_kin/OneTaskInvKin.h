@@ -16,12 +16,15 @@
 #include <kdl_parser/kdl_parser.hpp>
 #include <eigen3/Eigen/Eigen>
 #include <skew_symmetric.h>
+#include <pseudo_inversion.h>
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/condition.hpp>
 
 #include <sensor_msgs/JointState.h>
 #include <geometry_msgs/Pose.h>
+#include <std_msgs/Float64MultiArray.h>
+
 
 
 class OneTaskInvKin
@@ -31,9 +34,7 @@ class OneTaskInvKin
 		~OneTaskInvKin();
 
 		void run();
-
-
-  	double dt_;
+		double dt_;
 
 	private:
 
@@ -48,6 +49,7 @@ class OneTaskInvKin
 	
 		ros::NodeHandle n_;
 		ros::Subscriber sub_joint_states_, sub_des_pos_;
+		ros::Publisher pub_joint_cmd_;
 
 		KDL::Chain kdl_chain_;
 
@@ -59,9 +61,10 @@ class OneTaskInvKin
 		boost::scoped_ptr<KDL::ChainJntToJacSolver> jnt_to_jac_solver_;
 		boost::scoped_ptr<KDL::ChainFkSolverPos_recursive> fk_pos_solver_;
 
-		Eigen::VectorXd joint_location_;
+		Eigen::VectorXd joint_location_, q_eig_;
 		Eigen::Vector3d pos_d_;
 		Eigen::Quaterniond quat_d_;
 		Eigen::MatrixXd k_;
+		int step_;
 		bool flag_joint_msr_;
 };
