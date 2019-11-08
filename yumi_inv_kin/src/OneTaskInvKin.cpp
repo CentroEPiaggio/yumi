@@ -88,7 +88,7 @@ OneTaskInvKin::OneTaskInvKin()
 	J_.resize(kdl_chain_.getNrOfJoints());
 	q_eig_ = Eigen::VectorXd::Zero(kdl_chain_.getNrOfJoints());
 
-	k_ = Eigen::Matrix<double, 6, 6>::Identity() * 5.0;
+	k_ = Eigen::Matrix<double, 6, 6>::Identity() * 8.0;
 	step_ = 2;
 	flag_joint_msr_ = false;
 
@@ -108,10 +108,18 @@ OneTaskInvKin::~OneTaskInvKin()
 
 void OneTaskInvKin::callback_joint_states(const sensor_msgs::JointState::ConstPtr& msg)
 {
-	for(int i = 0; i < kdl_chain_.getNrOfJoints(); i++)
-	{
-		q_msr_(i) = msg->position[joint_location_(i)];
-	}
+	// for(int i = 0; i < kdl_chain_.getNrOfJoints(); i++)
+	// {
+	// 	q_msr_(i) = msg->position[joint_location_(i)];
+	// }
+	q_msr_(0) = msg->position[joint_location_(0)];
+	q_msr_(1) = msg->position[joint_location_(1)];
+	q_msr_(2) = msg->position[joint_location_(6)];
+	q_msr_(3) = msg->position[joint_location_(2)];
+	q_msr_(4) = msg->position[joint_location_(3)];
+	q_msr_(5) = msg->position[joint_location_(4)];
+	q_msr_(6) = msg->position[joint_location_(5)];
+
 	if(flag_joint_msr_ == false)
 	{
 		step_ = 0;
@@ -136,16 +144,6 @@ void OneTaskInvKin::callback_des_pose(const geometry_msgs::Pose::ConstPtr& msg)
 void OneTaskInvKin::init()
 {
 	q_ = q_msr_;
-
-	// test
-	q_msr_(0) = q_(0);
-	q_msr_(1) = q_(1);
-	q_msr_(2) = q_(6);
-	q_msr_(3) = q_(2);
-	q_msr_(4) = q_(3);
-	q_msr_(5) = q_(4);
-	q_msr_(6) = q_(5);
-	// test
 
 	for(int i = 0; i < kdl_chain_.getNrOfJoints(); i++) q_eig_(i) = q_msr_(i);
 
@@ -232,18 +230,11 @@ void OneTaskInvKin::update()
 
 	for(int i = 0; i < kdl_chain_.getNrOfJoints(); i++) 
 	{
-		q_(i) = q_eig_(i);	
+		q_(i) = q_eig_(i);
+		joint_cmd.data.push_back(q_(i));
 	}
 
-	joint_cmd.data.push_back(q_(0));
-	joint_cmd.data.push_back(q_(1));
-	joint_cmd.data.push_back(q_(6));
-	joint_cmd.data.push_back(q_(2));
-	joint_cmd.data.push_back(q_(3));
-	joint_cmd.data.push_back(q_(4));
-	joint_cmd.data.push_back(q_(5));
-
-	// pub_joint_cmd_.publish(joint_cmd);
+	pub_joint_cmd_.publish(joint_cmd);
 
 }
 

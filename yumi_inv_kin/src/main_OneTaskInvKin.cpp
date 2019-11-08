@@ -16,16 +16,16 @@ int main(int argc, char **argv)
 
   OneTaskInvKin Obj;
   // std::cout<<"sono qui"<<std::endl;
-  double rate_100Hz = 100.0;
-  ros::Rate r_100HZ(rate_100Hz);
-  Obj.dt_ = 1.0/rate_100Hz;
+  double rate_200Hz = 200.0;
+  ros::Rate r_200HZ(rate_200Hz);
+  Obj.dt_ = 1.0/rate_200Hz;
 
 
   while(ros::ok())
   {
     Obj.run();
     ros::spinOnce();
-    r_100HZ.sleep();
+    r_200HZ.sleep();
         
   }// end while()
 return 0;
