@@ -1,10 +1,10 @@
 #include <OneTaskInvKin.h>
 OneTaskInvKin::OneTaskInvKin()
 {
+
 	std::string robot_description, root_name, tip_name;
 	robot_description = n_.getNamespace() + "/robot_description";
 
-	// xml_string = "";
 
 	if (!n_.getParam("root_name", root_name))
     {
@@ -71,16 +71,24 @@ OneTaskInvKin::OneTaskInvKin()
     ROS_DEBUG("Number of segments: %d", kdl_chain_.getNrOfSegments());
     ROS_DEBUG("Number of joints in chain: %d", kdl_chain_.getNrOfJoints());
 
+    std::vector<double> joint_location;
+    n_.getParam("joint_location", joint_location);
+    joint_location_ = Eigen::VectorXd::Zero(kdl_chain_.getNrOfJoints());
+    joint_location_ << joint_location[0], joint_location[1], joint_location[2],joint_location[3], joint_location[4], joint_location[5], joint_location[6]; 
 
-	// Eigen::Vector3d vec_cam_2_base;
-	// Eigen::Quaterniond quat_cam_2_base;
-	
-	// vec_cam_2_base << translation[0], translation[1], translation[2];
-	// quat_cam_2_base.w() = rotation[3];
-	// quat_cam_2_base.vec() << rotation[0], rotation[1], rotation[2];
+	jnt_to_jac_solver_.reset(new KDL::ChainJntToJacSolver(kdl_chain_));
+	fk_pos_solver_.reset(new KDL::ChainFkSolverPos_recursive(kdl_chain_));
+
+	q_msr_.resize(kdl_chain_.getNrOfJoints());
+	q_.resize(kdl_chain_.getNrOfJoints());
+	J_.resize(kdl_chain_.getNrOfJoints());
+
+	k_ = Eigen::Matrix<double, 6, 6>::Identity() * 5.0;
+	flag_joint_msr_ = false;
 
 	// //Subscriber
-	// sub_button_start_teach_ = n_.subscribe(topic_botton_start_teach_, 1, &OneTaskInvKin::callback_button_start_teach, this);
+	sub_joint_states_ = n_.subscribe("/yumi/joint_states", 1, &OneTaskInvKin::callback_joint_states, this);
+	sub_des_pos_ = n_.subscribe("command", 10, &OneTaskInvKin::callback_des_pose, this);
 
 	// //Publisher
  //    pub_pos_des_ = n_.advertise<geometry_msgs::PoseStamped>(topic_pose_des, 1);
@@ -92,3 +100,105 @@ OneTaskInvKin::~OneTaskInvKin()
 
 }
 
+void OneTaskInvKin::callback_joint_states(const sensor_msgs::JointState::ConstPtr& msg)
+{
+	for(int i = 0; i < kdl_chain_.getNrOfJoints(); i++)
+	{
+		q_msr_(i) = msg->position[joint_location_(i)];
+	}
+	flag_joint_msr_ = true;
+}
+
+void OneTaskInvKin::callback_des_pose(const geometry_msgs::Pose::ConstPtr& msg)
+{
+	pos_d_(0) = msg->position.x;
+	pos_d_(1) = msg->position.y;
+	pos_d_(2) = msg->position.z;
+
+	quat_d_.w() = msg->orientation.w;
+	quat_d_.x() = msg->orientation.x;
+	quat_d_.y() = msg->orientation.y;
+	quat_d_.z() = msg->orientation.z;
+}
+
+
+void OneTaskInvKin::init()
+{
+	q_ = q_msr_;
+	// computing forward kinematics
+   	fk_pos_solver_->JntToCart(q_msr_, x_);
+   	Eigen::Matrix3d orient_d;
+   	for(int i = 0; i < 3; i++)
+	{
+		pos_d_(i) = x_.p(i);
+
+		for(int j = 0; j < 3; j++)
+		{
+			orient_d(i, j) = x_.M(i, j);
+		}
+	}
+	quat_d_ = orient_d;
+}
+
+void OneTaskInvKin::update()
+{
+	// Compute the forward kinematics and Jacobian (at this location).
+	fk_pos_solver_->JntToCart(q_, x_);
+	jnt_to_jac_solver_->JntToJac(q_, J_);
+
+	// Position and rot matrix from kdl to Eigen
+	Eigen::Vector3d pos, e_pos, e_quat;
+	Eigen::Matrix3d orient, skew;
+	Eigen::MatrixXd Jac_, Jac_pinv;
+	Eigen::Quaterniond quat;
+	Eigen::VectorXd e(Eigen::VectorXd::Zero(6));
+	KDL::Vector quat_d_vec;
+
+	Jac_.resize(6, kdl_chain_.getNrOfJoints());
+	Jac_pinv.resize(6, kdl_chain_.getNrOfJoints());
+
+	for(int i = 0; i < 3; i++)
+	{
+		pos(i) = x_.p(i);
+
+		for(int j = 0; j < 3; j++)
+		{
+			orient(i, j) = x_.M(i, j);
+		}
+	}
+
+	for(int i = 0; i < 6 ; i++)
+	{
+		for(int j = 0; j < kdl_chain_.getNrOfJoints(); j++)
+		{
+			Jac_(i, j) = J_(i, j);
+
+		}	
+	}
+
+	//from matrix to quat
+	quat = orient;
+	quat.normalize();
+
+	quat_d_vec(0) = quat_d_.x();
+	quat_d_vec(1) = quat_d_.y();
+	quat_d_vec(2) = quat_d_.z();
+
+	skew_symmetric(quat_d_vec, skew);
+
+	e_pos = pos_d_ - pos;
+	e_quat = (quat.w() * quat_d_.vec()) - (quat_d_.w() * quat.vec()) - (skew * quat.vec()); 
+
+	e << e_pos, e_quat;
+
+	// pseudo_inverse(Jac_ , Jac_pinv,true);
+		
+	// qdot_R_ = Jac_pinv * (k_ * e);
+
+	// q_eig_ += qdot_R_ * dt;
+}
+
+void OneTaskInvKin::run()
+{
+
+}

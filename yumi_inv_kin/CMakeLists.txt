@@ -126,6 +126,7 @@ include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
   include/yumi_inv_kin
+  include/utils
 )
 
 ## Declare a C++ library
